@@ -702,19 +702,21 @@ class ConnectionState:
 
     def parse_channel_pins_update(self, data):
         channel_id = int(data['channel_id'])
-        channel = self.get_channel(channel_id)
+        try:
+            guild = self._get_guild(int(data['guild_id']))
+        except KeyError:
+            guild = None
+            channel = self._get_private_channel(channel_id)
+        else:
+            channel = guild and guild._resolve_channel(channel_id)
+
         if channel is None:
             log.debug('CHANNEL_PINS_UPDATE referencing an unknown channel ID: %s. Discarding.', channel_id)
             return
 
         last_pin = utils.parse_time(data['last_pin_timestamp']) if data['last_pin_timestamp'] else None
 
-        try:
-            # I have not imported discord.abc in this file
-            # the isinstance check is also 2x slower than just checking this attribute
-            # so we're just gonna check it since it's easier and faster and lazier
-            channel.guild
-        except AttributeError:
+        if guild is None:
             self.dispatch('private_channel_pins_update', channel, last_pin)
         else:
             self.dispatch('guild_channel_pins_update', channel, last_pin)
@@ -1133,7 +1135,12 @@ class ConnectionState:
             log.debug('INTEGRATION_DELETE referencing an unknown guild ID: %s. Discarding.', guild_id)
 
     def parse_webhooks_update(self, data):
-        channel = self.get_channel(int(data['channel_id']))
+        guild = self._get_guild(int(data['guild_id']))
+        if guild is None:
+            log.debug('WEBHOOKS_UPDATE referencing an unknown guild ID: %s. Discarding', data['guild_id'])
+            return
+
+        channel = guild.get_channel(int(data['channel_id']))
         if channel is not None:
             self.dispatch('webhooks_update', channel)
         else:
@@ -1227,8 +1234,7 @@ class ConnectionState:
                 member = utils.find(lambda x: x.id == user_id, channel.recipients)
 
             if member is not None:
-                timestamp = datetime.datetime.utcfromtimestamp(data.get('timestamp'))
-                timestamp = timestamp.replace(tzinfo=datetime.timezone.utc)
+                timestamp = datetime.datetime.fromtimestamp(data.get('timestamp'), tz=datetime.timezone.utc)
                 self.dispatch('typing', channel, member, timestamp)
 
     def _get_reaction_user(self, channel, user_id):
