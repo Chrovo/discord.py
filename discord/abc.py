@@ -1684,6 +1684,6 @@ class Connectable(Protocol):
             except Exception:
                 # we don't care if disconnect failed because connection failed
                 pass
-            raise  # re-raise
+            raise  # re-raise 
 
         return voice
