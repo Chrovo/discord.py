@@ -224,5 +224,4 @@ All in all, the result of our code should look like this:
 
 Conclusion
 ----------
-
-.. working on
+In discord.py, the 'commands.Bot' version has a default help command for commands automatically. You can modify the descriptions and do things with the help command. We can also override some stuff of the help command.
